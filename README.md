@@ -1,13 +1,11 @@
 # Automating-the-Information-Extraction
 
-A lightweight, research-oriented toolkit for (1) discovering relevant scientific papers and (2) extracting structured information from PDFs using evidence-based heuristics and an optional local LLM (Ollama).
+This repository contains two **separate** tools:
 
-This repository contains two modules:
+1. **Paper Finder** — helps you **find and shortlist papers** from multiple scholarly platforms (OpenAlex, PubMed, arXiv) and export the results.
+2. **Info Extractor** — helps you **extract structured information from a specific paper (PDF)** by uploading it (or providing a URL) and defining a custom schema; extraction is done via **heuristics** and optionally a **local LLM (Ollama)**.
 
-- **paper-finder**: a browser-based paper search interface for OpenAlex, PubMed, and arXiv with CSV export
-- **info-extractor**: a local web app (FastAPI backend + HTML frontend) for schema-driven extraction from PDF URL uploads or local PDFs
-
-The goal is to support transparent, reproducible data extraction workflows for evidence synthesis and meta-research.
+The tools are intentionally decoupled: Paper Finder supports *paper discovery*, while Info Extractor supports *paper-level structured data extraction*.
 
 ---
 
@@ -23,95 +21,128 @@ Automating-the-Information-Extraction/
 └── extractor_ui.html
 
 
-> Folder names use hyphens to avoid space-related path issues on Windows and in scripts.
-
 ---
 
 ## 1) Paper Finder (OpenAlex + PubMed + arXiv)
 
-### What it does
-`paper-finder/search.html` provides a simple UI to:
-- search **OpenAlex**, **PubMed**, and **arXiv**
-- filter by publication year and per-source result limits
-- optionally restrict OpenAlex to **open-access**
-- select results and **export selected papers to CSV**
-- open available PDF links (OA PDFs when available)
+### Purpose
+Paper Finder is a lightweight browser UI for **searching and collecting candidate papers** across:
+- **OpenAlex**
+- **PubMed**
+- **arXiv**
 
-### How to run
-This is a static HTML file.
+It is designed for quickly building a shortlist that you can later screen or feed into downstream extraction.
 
-**Option A (quickest):** open in browser  
-Double-click `paper-finder/search.html`.
+### Key features
+- Query-based search with **year range** filtering
+- Adjustable **max results per source**
+- Source selection (enable/disable OpenAlex/PubMed/arXiv)
+- **OpenAlex open-access-only** filter (optional)
+- Manual selection of papers
+- Export selected papers to **CSV**
+- Open available **PDF links** (where present)
+
+### Run Paper Finder
+Paper Finder is a **static HTML file**.
+
+**Option A (simplest):**
+- Open `paper-finder/search.html` directly in your browser (double-click).
 
 **Option B (recommended): serve locally**
-From the repo root:
-
 ```bash
 cd paper-finder
 python -m http.server 5174
+
 Open:
-
 http://127.0.0.1:5174/search.html
-2) Info Extractor (FastAPI + HTML frontend + optional Ollama)
-What it does
-info-extractor extracts structured fields from PDFs in a schema-driven way:
 
-You define fields (e.g., title, authors[], sample_size, TR, TE)
+Notes / limitations
 
-The frontend generates a JSON Schema automatically
+OpenAlex can provide OA PDF links when available.
 
-The backend extracts:
+PubMed results link to PubMed landing pages; OA detection is limited in this MVP.
 
-heuristics (regex + evidence snippets) for key technical fields
+arXiv is open by default and typically provides direct PDF links.
 
-optionally uses a local LLM via Ollama to fill missing fields
+2) Info Extractor (PDF Upload/URL → Schema-driven extraction)
+Purpose
 
-The app returns:
+Info Extractor is a paper-level information extraction tool:
 
-extracted JSON
+You upload a PDF (or provide a PDF URL),
 
-evidence contexts for heuristic hits
+specify what fields you want to extract (schema),
 
-schema validation results
+and the system returns structured output as JSON (plus downloadable CSV).
 
-a one-row CSV download for quick export
+It supports two extraction modes:
 
-Requirements
-Python 3.9+ recommended
+Heuristics mode (default): regex-based extraction with evidence snippets (fast, transparent)
 
-Conda environment (as used in your workflow): paperextract
+LLM mode (optional): uses a local Ollama model to fill fields according to a JSON schema, with heuristics used as evidence-based fallback for missing/null values
 
-Dependencies typically include:
+Key features
 
-fastapi, uvicorn, httpx, pymupdf (fitz), jsonschema
+Upload PDF or provide PDF URL
 
-If you add a requirements.txt later, include these packages for reproducibility.
+Define extraction targets using Fields (one per line) (e.g., title, authors[], sample_size, TR)
 
-How to run (quick checklist)
+Auto-generates JSON Schema from your field list
+
+(Optional) Convert a natural-language request into a field list using Ollama
+
+Extraction output includes:
+
+extracted_json (final structured output)
+
+evidence (heuristic matches + context)
+
+validation_errors (JSON Schema validation)
+
+backend notes (mode used, merge policy, etc.)
+
+One-click Download CSV (single-row export from extracted JSON)
+
+How to run Info Extractor (Windows, local)
+Terminal 1 — Ollama (optional, only if using local LLM)
+
+How to run Info Extractor (Windows, local)
 Terminal 1 — Ollama (optional, only if using local LLM)
 ollama serve
-If Ollama is already running, you can skip this.
+
+
+If Ollama is already running, skip this.
 
 Terminal 2 — Backend (FastAPI)
 cd "C:\Users\imam\Documents\paper-extractor\info-extractor\backend"
 conda activate paperextract
 uvicorn server:app --reload --port 8000
-Backend runs at:
 
-http://127.0.0.1:8000
-API docs:
 
-http://127.0.0.1:8000/docs
+Backend:
+
+API root: http://127.0.0.1:8000
+
+Swagger docs: http://127.0.0.1:8000/docs
+
 Terminal 3 — Frontend server (static HTML)
 cd "C:\Users\imam\Documents\paper-extractor\info-extractor\frontend"
 python -m http.server 5173
-Open the UI:
+
+
+Open:
 
 http://127.0.0.1:5173/extractor_ui.html
-Using the extractor UI
-Provide a PDF URL (open access preferred) or upload a PDF file
 
-Provide a field list (one per line), e.g.
+Using the Info Extractor UI (typical workflow)
+
+Provide a PDF:
+
+PDF URL (open-access preferred), or
+
+Upload a local PDF (most reliable)
+
+Define fields to extract (one per line), e.g.
 
 title
 
@@ -131,32 +162,49 @@ scanner
 
 smoothing
 
-Click Generate schema (or keep auto-generate on)
+Click Generate schema (or keep auto-generate enabled)
 
 Click Extract
 
-Optional: tick Use local LLM (Ollama)
+Default = heuristics
 
-Download a one-row CSV from the extracted JSON output
+Optional: tick Use local LLM (Ollama) and choose model + number of pages sent to the LLM
 
-Notes on Open Access and PDFs
-Paper Finder will only open/export PDF links when an OA PDF link is available.
+Review:
 
-PubMed OA detection is limited in the current MVP (OA is treated as unknown in PubMed mode).
+Extracted JSON
 
-For extraction, uploads are the most reliable because some PDF URLs block automated downloads.
+Evidence snippets (heuristics)
 
-Data and reproducibility
-Recommended practice:
+Validation errors (if any)
 
-Do not commit large PDFs, extracted datasets, or private materials to GitHub.
+Click Download CSV to export a single-row CSV
 
-Keep raw PDFs locally and commit only code, schemas, and small demo outputs.
+Extraction behavior (important)
+
+Heuristics provide evidence-based matches for selected fields (e.g., sample_size, TR, TE, scanner strength, smoothing).
+
+If LLM extraction is enabled:
+
+The LLM is asked to output JSON matching the schema.
+
+The final output follows the policy:
+
+LLM first
+
+then fill missing/null values from heuristics when available (evidence-based)
+
+Recommended practice (data + reproducibility)
+
+Avoid committing large PDFs or private datasets to GitHub.
+
+Keep PDFs locally in a non-tracked folder (e.g., data/) and commit only code and small demo artifacts.
 
 License
-See LICENSE in this repository.
+
+See the LICENSE file in this repository.
 
 Contact
+
 Maintainer: Sana Hassan Imam
 GitHub: sanahassanimam
-
