@@ -160,5 +160,3 @@ Contact
 Maintainer: Sana Hassan Imam
 GitHub: sanahassanimam
 
-
-If you want, paste your **final folder names exactly** (the two hyphen names you ended up using), and I’ll adjust the repository tree block to match them perfectly.
