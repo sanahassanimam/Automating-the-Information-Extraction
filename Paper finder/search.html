@@ -1,0 +1,318 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Paper Finder (OpenAlex + PubMed + arXiv)</title>
+  <style>
+    body { font-family: system-ui, Arial, sans-serif; max-width: 1100px; margin: 18px auto; padding: 0 12px; }
+    .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: end; }
+    input, select, button, textarea { padding: 8px; font-size: 14px; }
+    input[type="number"]{ width: 120px; }
+    textarea { width: 100%; min-height: 70px; }
+    .card { border: 1px solid #ddd; border-radius: 12px; padding: 12px; margin: 10px 0; }
+    .meta { opacity: 0.8; margin-top: 4px; }
+    .links a { margin-right: 10px; }
+    .pill { display:inline-block; padding:2px 8px; border:1px solid #ccc; border-radius:999px; font-size:12px; margin-left:8px; }
+    .small { font-size: 12px; opacity: 0.85; }
+    .actions { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin: 12px 0; }
+  </style>
+</head>
+<body>
+  <h2>Paper Finder</h2>
+  <div class="small">
+    Searches OpenAlex, PubMed, and arXiv. Downloads only open links (OA PDFs when available).
+  </div>
+
+  <div class="row" style="margin-top: 12px;">
+    <div style="flex: 1; min-width: 280px;">
+      <label>Query</label><br/>
+      <input id="q" style="width: 100%;" value="graph learning functional connectivity"/>
+    </div>
+    <div>
+      <label>Year from</label><br/>
+      <input id="y1" type="number" value="2019"/>
+    </div>
+    <div>
+      <label>Year to</label><br/>
+      <input id="y2" type="number" value="2026"/>
+    </div>
+    <div>
+      <label>Max / source</label><br/>
+      <input id="max" type="number" value="10"/>
+    </div>
+  </div>
+
+  <div class="actions">
+    <label><input id="src_openalex" type="checkbox" checked/> OpenAlex</label>
+    <label><input id="src_pubmed" type="checkbox" checked/> PubMed</label>
+    <label><input id="src_arxiv" type="checkbox" /> arXiv</label>
+    <label><input id="oaOnly" type="checkbox"/> Open-access only </label>
+    <button id="btnSearch">Search</button>
+    <button id="btnExport" disabled>Export selected (CSV)</button>
+    <button id="btnOpenPdfs" disabled>Open selected PDF links</button>
+    <span id="status" class="small"></span>
+  </div>
+
+  <div style="margin-top: 10px;">
+    <label>Optional prompt (used only for local keyword hinting; no LLM here)</label>
+    <textarea id="prompt" placeholder="e.g., Prefer NeuroImage; include HCP; focus on methods/benchmarking"></textarea>
+  </div>
+
+  <hr/>
+
+  <div id="results"></div>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+
+  function csvEscape(s){
+    s = (s ?? "").toString();
+    return `"${s.replaceAll('"','""')}"`;
+  }
+
+  function getSelectedPapers(){
+    const checks = document.querySelectorAll('input[data-paper-id]:checked');
+    const ids = new Set([...checks].map(c => c.getAttribute('data-paper-id')));
+    return window.__papers.filter(p => ids.has(p.id));
+  }
+
+  function updateButtons(){
+    const sel = getSelectedPapers();
+    $("btnExport").disabled = sel.length === 0;
+    $("btnOpenPdfs").disabled = sel.length === 0;
+  }
+
+  function normalizeTitle(t){ return (t || "").replace(/\s+/g," ").trim(); }
+
+  async function searchOpenAlex(q, y1, y2, max, oaOnly){
+    const params = new URLSearchParams();
+    params.set("search", q);
+    params.set("per-page", String(max));
+    const filters = [];
+    if (y1) filters.push(`from_publication_date:${y1}-01-01`);
+    if (y2) filters.push(`to_publication_date:${y2}-12-31`);
+    if (oaOnly) filters.push(`open_access.is_oa:true`);
+    if (filters.length) params.set("filter", filters.join(","));
+    const url = `https://api.openalex.org/works?${params.toString()}`;
+    const r = await fetch(url, { headers: { "User-Agent": "PaperFinder/1.0" }});
+    const data = await r.json();
+    const out = [];
+    for (const w of (data.results || [])){
+      const authors = (w.authorships || []).map(a => a?.author?.display_name).filter(Boolean);
+      const oa = (w.open_access && w.open_access.is_oa) === true;
+      const best = w.best_oa_location || {};
+      const pdf = best.pdf_url || null;
+      const landing = best.landing_page_url || w?.primary_location?.landing_page_url || null;
+      if (oaOnly && !oa) continue;
+      out.push({
+        id: w.id,
+        title: normalizeTitle(w.title),
+        authors,
+        year: w.publication_year ?? null,
+        venue: w?.primary_location?.source?.display_name ?? null,
+        source: "OpenAlex",
+        oa,
+        pdf_url: pdf,
+        landing_url: landing,
+        doi: w.doi || null
+      });
+    }
+    return out;
+  }
+
+  async function searchPubMed(q, y1, y2, max, oaOnly){
+    // Note: OA filtering is hard without extra calls (PMC/Unpaywall). We'll treat as "unknown OA".
+    // If oaOnly is checked, we'll still return results but mark oa as false unless a PMC link exists (not in this MVP).
+    const base = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils";
+    let term = q;
+    if (y1 || y2){
+      const a = y1 || 1800, b = y2 || 2100;
+      term = `(${term}) AND (${a}:${b}[pdat])`;
+    }
+    const esearchUrl = `${base}/esearch.fcgi?db=pubmed&retmode=json&retmax=${encodeURIComponent(max)}&term=${encodeURIComponent(term)}`;
+    const s = await fetch(esearchUrl);
+    const sj = await s.json();
+    const ids = sj?.esearchresult?.idlist || [];
+    if (!ids.length) return [];
+
+    const esummaryUrl = `${base}/esummary.fcgi?db=pubmed&retmode=json&id=${ids.join(",")}`;
+    const sum = await fetch(esummaryUrl);
+    const sumj = await sum.json();
+    const result = sumj?.result || {};
+
+    const out = [];
+    for (const pid of ids){
+      const it = result[pid];
+      if (!it) continue;
+      const title = normalizeTitle(it.title || "");
+      const authors = (it.authors || []).map(a => a?.name).filter(Boolean);
+      const pubdate = it.pubdate || "";
+      const year = (pubdate.slice(0,4).match(/^\d{4}$/)) ? Number(pubdate.slice(0,4)) : null;
+      const landing = `https://pubmed.ncbi.nlm.nih.gov/${pid}/`;
+      const oa = false; // unknown in MVP
+      if (oaOnly) {
+        // best-effort: we cannot confirm OA here → skip OR keep. I’ll skip to respect your checkbox.
+        continue;
+      }
+      out.push({
+        id: `PMID:${pid}`,
+        title,
+        authors,
+        year,
+        venue: it.fulljournalname || null,
+        source: "PubMed",
+        oa,
+        pdf_url: null,
+        landing_url: landing,
+        doi: null
+      });
+    }
+    return out;
+  }
+
+  async function searchArxiv(q, y1, y2, max, oaOnly){
+    // arXiv is open, so oaOnly doesn't exclude it
+    const url = `https://export.arxiv.org/api/query?search_query=all:${encodeURIComponent(q)}&start=0&max_results=${encodeURIComponent(max)}`;
+    const r = await fetch(url);
+    const xmlText = await r.text();
+    const parser = new DOMParser();
+    const xml = parser.parseFromString(xmlText, "application/xml");
+    const entries = [...xml.getElementsByTagName("entry")];
+
+    const out = [];
+    for (const e of entries){
+      const title = normalizeTitle(e.getElementsByTagName("title")[0]?.textContent || "");
+      const published = e.getElementsByTagName("published")[0]?.textContent || "";
+      const year = published.slice(0,4).match(/^\d{4}$/) ? Number(published.slice(0,4)) : null;
+      if (y1 && year && year < y1) continue;
+      if (y2 && year && year > y2) continue;
+
+      const authorEls = [...e.getElementsByTagName("author")];
+      const authors = authorEls.map(a => a.getElementsByTagName("name")[0]?.textContent).filter(Boolean);
+
+      const id = e.getElementsByTagName("id")[0]?.textContent || "";
+      const absUrl = id;
+      const pdfUrl = absUrl.includes("/abs/") ? absUrl.replace("/abs/","/pdf/") + ".pdf" : null;
+
+      out.push({
+        id: `arXiv:${id}`,
+        title,
+        authors,
+        year,
+        venue: "arXiv",
+        source: "arXiv",
+        oa: true,
+        pdf_url: pdfUrl,
+        landing_url: absUrl,
+        doi: null
+      });
+    }
+    return out;
+  }
+
+  function render(papers){
+    window.__papers = papers;
+    const root = $("results");
+    root.innerHTML = "";
+    if (!papers.length){
+      root.innerHTML = `<div class="small">No results.</div>`;
+      updateButtons();
+      return;
+    }
+
+    for (const p of papers){
+      const div = document.createElement("div");
+      div.className = "card";
+      const authors = (p.authors || []).slice(0,10).join(", ") + ((p.authors||[]).length > 10 ? "…" : "");
+      const pdfLink = p.pdf_url ? `<a href="${p.pdf_url}" target="_blank" rel="noreferrer">PDF</a>` : "";
+      const landing = p.landing_url ? `<a href="${p.landing_url}" target="_blank" rel="noreferrer">Landing</a>` : "";
+      const oaPill = p.oa ? `<span class="pill">OA</span>` : `<span class="pill">OA?</span>`;
+
+      div.innerHTML = `
+        <label style="display:flex; gap:10px;">
+          <input type="checkbox" data-paper-id="${p.id}" />
+          <div style="flex:1;">
+            <div style="font-weight:700;">${p.title} ${oaPill}</div>
+            <div class="meta">${authors || ""}</div>
+            <div class="meta">${p.year ?? "—"} · ${p.venue ?? "—"} · ${p.source}</div>
+            <div class="links" style="margin-top:8px;">${landing} ${pdfLink}</div>
+          </div>
+        </label>
+      `;
+      root.appendChild(div);
+    }
+
+    // bind checkbox updates
+    root.querySelectorAll('input[data-paper-id]').forEach(cb => {
+      cb.addEventListener("change", updateButtons);
+    });
+    updateButtons();
+  }
+
+  $("btnSearch").addEventListener("click", async () => {
+    const q = $("q").value.trim();
+    const y1 = Number($("y1").value) || null;
+    const y2 = Number($("y2").value) || null;
+    const max = Number($("max").value) || 10;
+    const oaOnly = $("oaOnly").checked;
+
+    const useOpenAlex = $("src_openalex").checked;
+    const usePubMed = $("src_pubmed").checked;
+    const useArxiv = $("src_arxiv").checked;
+
+    $("status").textContent = "Searching...";
+    $("btnExport").disabled = true;
+    $("btnOpenPdfs").disabled = true;
+
+    try{
+      let all = [];
+      if (useOpenAlex) all = all.concat(await searchOpenAlex(q, y1, y2, max, oaOnly));
+      if (usePubMed)  all = all.concat(await searchPubMed(q, y1, y2, max, oaOnly));
+      if (useArxiv)   all = all.concat(await searchArxiv(q, y1, y2, max, oaOnly));
+
+      // sort newest first
+      all.sort((a,b) => (b.year||0) - (a.year||0));
+      render(all);
+      $("status").textContent = `Done. Results: ${all.length}`;
+    } catch (e){
+      console.error(e);
+      $("status").textContent = "Error. Check console (F12).";
+    }
+  });
+
+  $("btnExport").addEventListener("click", () => {
+    const sel = getSelectedPapers();
+    const headers = ["title","authors","year","venue","doi","source","oa","pdf_url","landing_url"];
+    const rows = sel.map(p => ([
+      p.title,
+      (p.authors || []).join("; "),
+      p.year ?? "",
+      p.venue ?? "",
+      p.doi ?? "",
+      p.source,
+      p.oa ? "true" : "false",
+      p.pdf_url ?? "",
+      p.landing_url ?? ""
+    ]));
+    const csv = [headers.join(","), ...rows.map(r => r.map(csvEscape).join(","))].join("\n");
+    const blob = new Blob([csv], {type:"text/csv"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "selected_papers.csv";
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
+
+  $("btnOpenPdfs").addEventListener("click", () => {
+    const sel = getSelectedPapers();
+    const links = sel.map(p => p.pdf_url).filter(Boolean);
+    if (!links.length){
+      alert("No PDF links available in your selection (only OA PDFs are linked).");
+      return;
+    }
+    links.forEach(l => window.open(l, "_blank"));
+  });
+</script>
+</body>
+</html>

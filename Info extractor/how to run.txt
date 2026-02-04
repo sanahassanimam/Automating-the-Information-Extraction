@@ -1,0 +1,22 @@
+✅ How to run (quick checklist)
+Terminal 1 (Ollama)
+ollama serve
+
+
+(If already running, you can skip.)
+
+Terminal 2 (backend)
+cd "C:\Users\imam\Documents\paper-extractor\paper extractor\backend"
+conda activate paperextract
+uvicorn server:app --reload --port 8000
+
+Terminal 3 (frontend server)
+cd "C:\Users\imam\Documents\paper-extractor\paper extractor\frontend"
+python -m http.server 5173
+
+
+Open:
+
+http://127.0.0.1:5173/extractor_ui.html
+
+Tick ✅ “Use local LLM” and extract.

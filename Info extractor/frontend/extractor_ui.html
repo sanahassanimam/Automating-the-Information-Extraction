@@ -1,0 +1,393 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Paper Extractor (Dynamic Schema + Local LLM)</title>
+  <style>
+    body{font-family:system-ui,Segoe UI,Arial,sans-serif; max-width:1200px; margin:18px auto; padding:0 12px;}
+    h2{margin:0 0 6px 0;}
+    .small{font-size:12px; opacity:0.85;}
+    .row{display:flex; gap:12px; flex-wrap:wrap; align-items:flex-start;}
+    .box{border:1px solid #ddd; border-radius:14px; padding:12px; margin:12px 0; background:#fff;}
+    label{display:block; font-weight:600; margin:6px 0;}
+    input, textarea, button{padding:8px; font-size:14px;}
+    input[type="text"]{width:100%;}
+    textarea{width:100%; min-height:120px; font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;}
+    .btns{display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:10px;}
+    button{cursor:pointer;}
+    button:disabled{opacity:0.6; cursor:not-allowed;}
+    pre{white-space:pre-wrap; word-break:break-word; background:#f7f7f7; padding:10px; border-radius:12px; border:1px solid #eee;}
+    .col{flex:1; min-width:320px;}
+    .note{background:#f2f7ff; border:1px solid #d8e6ff;}
+    .warn{color:#8a4b00;}
+    .ok{color:#0f6b2e;}
+    .mono{font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;}
+    .split{display:grid; grid-template-columns: 1fr 1fr; gap:12px;}
+    @media(max-width: 900px){ .split{grid-template-columns: 1fr;} }
+  </style>
+</head>
+
+<body>
+  <h2>Paper Extractor — Dynamic Schema + Local LLM</h2>
+  <div class="small">
+    Flow: optional natural-language request → generate fields → schema auto-built → PDF URL/upload → Extract.
+    Backend: <span class="mono">http://127.0.0.1:8000</span> · Ollama: <span class="mono">http://127.0.0.1:11434</span>
+  </div>
+
+  <div class="box note">
+    <b>Tip:</b> For arrays, write <span class="mono">authors[]</span> or <span class="mono">preprocessing_steps[]</span>.
+    Spaces become underscores automatically.
+  </div>
+
+  <div class="box">
+    <div class="row">
+      <div class="col">
+        <label>PDF URL (open-access preferred)</label>
+        <input id="pdf_url" type="text" placeholder="https://.../paper.pdf (or leave empty and upload a PDF)"/>
+        <div class="small">If a URL fails, upload the PDF instead.</div>
+      </div>
+
+      <div style="min-width:280px;">
+        <label>Or upload PDF</label>
+        <input id="pdf_file" type="file" accept="application/pdf"/>
+        <div class="small">Uploads are most reliable.</div>
+      </div>
+
+      <div style="min-width:160px;">
+        <label>Max pages</label>
+        <input id="max_pages" type="number" value="30" min="1" max="200"/>
+        <div class="small">Text extraction limit.</div>
+      </div>
+    </div>
+
+    <label style="margin-top:14px;">Describe what you want (natural language, optional)</label>
+    <textarea id="nl_prompt" placeholder="Example:
+Extract title, authors, year, DOI, sample size, TR, TE, scanner, smoothing."></textarea>
+
+    <div class="btns">
+      <button id="btnFieldsFromPrompt">Generate fields from prompt</button>
+
+      <span class="small">Model used for field generation:</span>
+      <input id="schema_model" type="text" value="llama3:latest" style="min-width:220px;" title="Ollama model for field generation"/>
+
+      <span id="promptStatus" class="small"></span>
+    </div>
+
+    <div class="split" style="margin-top:10px;">
+      <div>
+        <label>Fields (one per line)</label>
+        <textarea id="fields" placeholder="Example:
+title
+authors[]
+year
+doi
+sample_size
+TR
+TE
+scanner
+smoothing">title
+authors[]
+sample_size
+TR
+TE
+scanner
+smoothing
+</textarea>
+
+        <div class="btns">
+          <button id="btnGenerate">Generate schema from fields</button>
+          <label style="font-weight:500; display:flex; gap:8px; align-items:center; margin:0;">
+            <input id="autoGenerate" type="checkbox" checked/>
+            Auto-generate as I type
+          </label>
+          <span id="schemaStatus" class="small"></span>
+        </div>
+      </div>
+
+      <div>
+        <label>Generated schema (JSON Schema)</label>
+        <textarea id="schema"></textarea>
+      </div>
+    </div>
+
+    <label style="margin-top:14px;">Optional prompt (extra extraction instructions)</label>
+    <textarea id="prompt" placeholder="Example:
+Prefer Methods section. If unknown, return null."></textarea>
+
+    <div class="btns">
+      <button id="btnExtract">Extract</button>
+
+      <label style="font-weight:500; display:flex; gap:8px; align-items:center; margin:0;">
+        <input id="llm_enabled" type="checkbox"/>
+        Use local LLM (Ollama) for extraction
+      </label>
+
+      <input id="llm_model" type="text" value="llama3:latest" style="min-width:220px;" title="Ollama model name for extraction"/>
+      <input id="llm_pages" type="number" value="1" min="1" max="10" style="width:90px;" title="Pages sent to LLM"/>
+
+      <button id="btnDownloadCSV" disabled>Download CSV</button>
+      <span id="status" class="small"></span>
+    </div>
+  </div>
+
+  <div class="box">
+    <div class="row">
+      <div class="col">
+        <h3 style="margin-top:0;">Extracted JSON (preview)</h3>
+        <pre id="out">(nothing yet)</pre>
+      </div>
+      <div class="col">
+        <h3 style="margin-top:0;">Evidence (heuristics)</h3>
+        <pre id="evidence">(nothing yet)</pre>
+      </div>
+    </div>
+
+    <h3>Validation errors</h3>
+    <pre id="val">(nothing yet)</pre>
+
+    <h3>Backend notes</h3>
+    <pre id="notes">(nothing yet)</pre>
+  </div>
+
+<script>
+  const EXTRACT_API = "http://127.0.0.1:8000/extract";
+  const SCHEMA_API = "http://127.0.0.1:8000/schema_from_prompt";
+
+  const $ = (id) => document.getElementById(id);
+
+  function setText(id, text){ $(id).textContent = text; }
+
+  function safeKeyName(name){
+    const underscored = name.trim().replace(/\s+/g, "_");
+    return underscored.replace(/[^A-Za-z0-9_]/g, "_");
+  }
+
+  function buildSchemaFromFields(fieldText){
+    const lines = fieldText.split("\n").map(s => s.trim()).filter(Boolean);
+    const properties = {};
+
+    for (let raw of lines){
+      let isArray = false;
+      let name = raw;
+
+      if (raw.endsWith("[]")){
+        isArray = true;
+        name = raw.slice(0, -2).trim();
+      }
+
+      name = safeKeyName(name);
+      if (!name) continue;
+
+      if (isArray){
+        properties[name] = { type: ["array", "null"], items: { type: "string" } };
+      } else {
+        properties[name] = { type: ["string", "null"] };
+      }
+    }
+
+    return { type: "object", properties, additionalProperties: true };
+  }
+
+  function prettyJSON(obj){ return JSON.stringify(obj, null, 2); }
+
+  function generateSchemaIntoTextarea(){
+    try{
+      const schemaObj = buildSchemaFromFields($("fields").value);
+      $("schema").value = prettyJSON(schemaObj);
+      $("schemaStatus").textContent = "Schema updated.";
+      $("schemaStatus").className = "small ok";
+    }catch(e){
+      $("schemaStatus").textContent = "Schema generation error: " + e;
+      $("schemaStatus").className = "small warn";
+    }
+  }
+
+  // Auto-generate on load
+  generateSchemaIntoTextarea();
+
+  $("btnGenerate").addEventListener("click", generateSchemaIntoTextarea);
+
+  $("fields").addEventListener("input", () => {
+    if ($("autoGenerate").checked){
+      generateSchemaIntoTextarea();
+    } else {
+      $("schemaStatus").textContent = "Auto-generate is off. Click 'Generate schema'.";
+      $("schemaStatus").className = "small";
+    }
+  });
+
+  $("autoGenerate").addEventListener("change", () => {
+    if ($("autoGenerate").checked) generateSchemaIntoTextarea();
+  });
+
+  async function generateFieldsFromPrompt(){
+    setText("promptStatus", "Generating fields...");
+    $("promptStatus").className = "small";
+
+    const req = $("nl_prompt").value.trim();
+    if (!req){
+      setText("promptStatus", "Please write what you want to extract.");
+      $("promptStatus").className = "small warn";
+      return;
+    }
+
+    const model = ($("schema_model").value || "llama3:latest").trim();
+
+    const fd = new FormData();
+    fd.append("user_request", req);
+    fd.append("llm_model", model);
+
+    try{
+      const r = await fetch(SCHEMA_API, { method:"POST", body: fd });
+      const data = await r.json().catch(() => ({}));
+
+      if (!r.ok){
+        setText("promptStatus", "Error: " + (data.detail || ("HTTP " + r.status)));
+        $("promptStatus").className = "small warn";
+        return;
+      }
+
+      const fields = data.fields || [];
+      if (!Array.isArray(fields) || fields.length === 0){
+        setText("promptStatus", "No fields returned. Try rephrasing.");
+        $("promptStatus").className = "small warn";
+        return;
+      }
+
+      $("fields").value = fields.join("\n");
+      generateSchemaIntoTextarea();
+
+      setText("promptStatus", "Fields updated. You can edit them before extraction.");
+      $("promptStatus").className = "small ok";
+    } catch(e){
+      setText("promptStatus", "Network error: " + e);
+      $("promptStatus").className = "small warn";
+    }
+  }
+
+  $("btnFieldsFromPrompt").addEventListener("click", generateFieldsFromPrompt);
+
+  // ----- CSV helpers -----
+  function csvEscape(value){
+    if (value === null || value === undefined) return "";
+    let s = String(value);
+    // Escape double quotes
+    s = s.replace(/"/g, '""');
+    // Wrap if needed
+    if (/[",\n\r]/.test(s)) s = `"${s}"`;
+    return s;
+  }
+
+  function objectToSingleRowCSV(obj){
+    const keys = Object.keys(obj || {});
+    const header = keys.map(csvEscape).join(",");
+    const row = keys.map(k => {
+      const v = obj[k];
+      if (Array.isArray(v)) return csvEscape(v.join("; "));
+      if (v && typeof v === "object") return csvEscape(JSON.stringify(v));
+      return csvEscape(v);
+    }).join(",");
+    return header + "\n" + row + "\n";
+  }
+
+  function downloadTextFile(filename, text, mime){
+    const blob = new Blob([text], { type: mime || "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  // Extract
+  async function runExtract(){
+    setText("status", "Working...");
+    $("btnDownloadCSV").disabled = true;
+
+    setText("out", "(working...)");
+    setText("evidence", "(working...)");
+    setText("val", "(working...)");
+    setText("notes", "(working...)");
+
+    const url = $("pdf_url").value.trim();
+    const file = $("pdf_file").files[0];
+    const schemaText = $("schema").value.trim();
+    const userPrompt = $("prompt").value;
+    const maxPages = String(Number($("max_pages").value) || 30);
+
+    if (!url && !file){
+      setText("status", "Please provide a PDF URL or upload a PDF.");
+      setText("out", "(nothing yet)");
+      setText("evidence", "(nothing yet)");
+      setText("val", "(nothing yet)");
+      setText("notes", "(nothing yet)");
+      return;
+    }
+    if (!schemaText){
+      setText("status", "Schema is empty. Generate schema first.");
+      return;
+    }
+
+    const fd = new FormData();
+    if (url) fd.append("pdf_url", url);
+    if (file) fd.append("pdf_file", file);
+    fd.append("schema_json", schemaText);
+    fd.append("user_prompt", userPrompt);
+    fd.append("max_pages", maxPages);
+
+    fd.append("llm_enabled", $("llm_enabled").checked ? "true" : "false");
+    fd.append("llm_model", ($("llm_model").value || "llama3:latest").trim());
+    fd.append("llm_pages", String(Number($("llm_pages").value) || 1));
+
+    try{
+      const r = await fetch(EXTRACT_API, { method:"POST", body: fd });
+      const data = await r.json().catch(() => ({}));
+
+      if (!r.ok){
+        const detail = data.detail || ("HTTP " + r.status);
+        setText("status", "Error: " + detail);
+        setText("out", prettyJSON(data));
+        setText("evidence", "(none)");
+        setText("val", "(none)");
+        setText("notes", "(none)");
+        return;
+      }
+
+      const extracted = data.extracted_json ?? {};
+      window.__lastExtracted = extracted;
+
+      setText("out", prettyJSON(extracted));
+      setText("evidence", prettyJSON(data.evidence ?? {}));
+      setText("val", prettyJSON(data.validation_errors ?? null));
+      setText("notes", prettyJSON(data.notes ?? {}));
+      setText("status", "Done.");
+
+      $("btnDownloadCSV").disabled = false;
+
+    } catch(e){
+      setText("status", "Network error: " + e);
+      setText("out", "(nothing yet)");
+      setText("evidence", "(nothing yet)");
+      setText("val", "(nothing yet)");
+      setText("notes", "(nothing yet)");
+    }
+  }
+
+  $("btnExtract").addEventListener("click", runExtract);
+
+  // Download CSV
+  $("btnDownloadCSV").addEventListener("click", () => {
+    const obj = window.__lastExtracted || {};
+    const csv = objectToSingleRowCSV(obj);
+    const ts = new Date().toISOString().replace(/[:.]/g, "-");
+    downloadTextFile(`extracted_${ts}.csv`, csv, "text/csv;charset=utf-8");
+    setText("status", "CSV downloaded.");
+  });
+</script>
+
+</body>
+</html>
