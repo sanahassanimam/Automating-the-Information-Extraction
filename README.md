@@ -1,225 +1,164 @@
-# Automating the Information Extraction
+# Automating-the-Information-Extraction
 
-A research-oriented toolkit for (1) identifying relevant scientific papers and (2) extracting structured information from full texts or metadata. The repository is organized into two main modules:
+A lightweight, research-oriented toolkit for (1) discovering relevant scientific papers and (2) extracting structured information from PDFs using evidence-based heuristics and an optional local LLM (Ollama).
 
-- **Paper Finder**: utilities for paper discovery, filtering, and candidate set construction  
-- **Info Extractor**: utilities for extracting structured study-level fields (e.g., sample size, demographics, setting, assessment timepoints), supporting reproducible downstream analysis
+This repository contains two modules:
 
-> **Goal:** Support transparent, reproducible information extraction workflows for evidence synthesis and meta-research.
+- **paper-finder**: a browser-based paper search interface for OpenAlex, PubMed, and arXiv with CSV export
+- **info-extractor**: a local web app (FastAPI backend + HTML frontend) for schema-driven extraction from PDF URL uploads or local PDFs
+
+The goal is to support transparent, reproducible data extraction workflows for evidence synthesis and meta-research.
 
 ---
 
 ## Repository structure
 
 Automating-the-Information-Extraction/
-├── Paper Finder/ # Paper search, retrieval helpers, filtering, candidate building
-├── Info Extractor/ # Extraction logic, prompts/templates, parsers, output writers
-├── README.md
-└── .gitignore
+├── paper-finder/
+│ └── search.html
+└── info-extractor/
+├── backend/
+│ └── server.py
+└── frontend/
+└── extractor_ui.html
 
-> Note: Folder names currently contain spaces (e.g., `Paper Finder`). This is supported by Git, Python, and most tools. If you later prefer naming without spaces, rename carefully and update imports/paths.
 
----
-
-## Requirements
-
-- Python 3.9+ recommended
-- (Optional) `pip`/`conda` environment for isolation
-
-If you already have a `requirements.txt` (or `environment.yml`), use it. Otherwise, you can add one later once dependencies stabilize.
+> Folder names use hyphens to avoid space-related path issues on Windows and in scripts.
 
 ---
 
-## Setup
+## 1) Paper Finder (OpenAlex + PubMed + arXiv)
 
-### Option A: `venv` (pip)
+### What it does
+`paper-finder/search.html` provides a simple UI to:
+- search **OpenAlex**, **PubMed**, and **arXiv**
+- filter by publication year and per-source result limits
+- optionally restrict OpenAlex to **open-access**
+- select results and **export selected papers to CSV**
+- open available PDF links (OA PDFs when available)
+
+### How to run
+This is a static HTML file.
+
+**Option A (quickest):** open in browser  
+Double-click `paper-finder/search.html`.
+
+**Option B (recommended): serve locally**
+From the repo root:
+
 ```bash
-python -m venv .venv
-# Windows:
-.venv\Scripts\activate
-# macOS/Linux:
-source .venv/bin/activate
+cd paper-finder
+python -m http.server 5174
+Open:
 
-pip install -U pip
-# If you have requirements:
-# pip install -r requirements.txt
-Option B: Conda
-conda create -n infoextract python=3.10
-conda activate infoextract
-# If you have requirements:
-# pip install -r requirements.txt
+http://127.0.0.1:5174/search.html
+2) Info Extractor (FastAPI + HTML frontend + optional Ollama)
+What it does
+info-extractor extracts structured fields from PDFs in a schema-driven way:
 
-Usage
-1) Paper Finder
+You define fields (e.g., title, authors[], sample_size, TR, TE)
 
-Typical workflow:
+The frontend generates a JSON Schema automatically
 
-Define your query/search strategy
+The backend extracts:
 
-Collect candidate results (IDs/DOIs/URLs)
+heuristics (regex + evidence snippets) for key technical fields
 
-Store a reproducible candidate list (CSV/JSON)
+optionally uses a local LLM via Ollama to fill missing fields
 
-Run scripts from inside Paper Finder/ (examples; adjust to your filenames):
+The app returns:
 
-cd "Paper Finder"
-python <your_script>.py --help
+extracted JSON
 
-2) Info Extractor
+evidence contexts for heuristic hits
 
-Typical workflow:
+schema validation results
 
-Provide paper PDFs or text exports
+a one-row CSV download for quick export
 
-Run extraction to generate a structured output (CSV/TSV/JSON)
+Requirements
+Python 3.9+ recommended
 
-Validate extracted fields and keep an audit trail (evidence spans, notes)
+Conda environment (as used in your workflow): paperextract
 
-Run scripts from inside Info Extractor/:
+Dependencies typically include:
 
-cd "Info Extractor"
-python <your_script>.py --help
+fastapi, uvicorn, httpx, pymupdf (fitz), jsonschema
+
+If you add a requirements.txt later, include these packages for reproducibility.
+
+How to run (quick checklist)
+Terminal 1 — Ollama (optional, only if using local LLM)
+ollama serve
+If Ollama is already running, you can skip this.
+
+Terminal 2 — Backend (FastAPI)
+cd "C:\Users\imam\Documents\paper-extractor\info-extractor\backend"
+conda activate paperextract
+uvicorn server:app --reload --port 8000
+Backend runs at:
+
+http://127.0.0.1:8000
+API docs:
+
+http://127.0.0.1:8000/docs
+Terminal 3 — Frontend server (static HTML)
+cd "C:\Users\imam\Documents\paper-extractor\info-extractor\frontend"
+python -m http.server 5173
+Open the UI:
+
+http://127.0.0.1:5173/extractor_ui.html
+Using the extractor UI
+Provide a PDF URL (open access preferred) or upload a PDF file
+
+Provide a field list (one per line), e.g.
+
+title
+
+authors[]
+
+year
+
+doi
+
+sample_size
+
+TR
+
+TE
+
+scanner
+
+smoothing
+
+Click Generate schema (or keep auto-generate on)
+
+Click Extract
+
+Optional: tick Use local LLM (Ollama)
+
+Download a one-row CSV from the extracted JSON output
+
+Notes on Open Access and PDFs
+Paper Finder will only open/export PDF links when an OA PDF link is available.
+
+PubMed OA detection is limited in the current MVP (OA is treated as unknown in PubMed mode).
+
+For extraction, uploads are the most reliable because some PDF URLs block automated downloads.
 
 Data and reproducibility
+Recommended practice:
 
-Large datasets and PDFs should generally not be committed to GitHub.
+Do not commit large PDFs, extracted datasets, or private materials to GitHub.
 
-Prefer storing inputs in a local data/ folder (ignored by git) and exporting clean, versioned outputs to outputs/ (also typically ignored unless you want to publish results).
-
-If you intend to publish a small example dataset, consider:
-
-data/sample/ (tiny, anonymized or public)
-
-outputs/example/ (small demonstration outputs)
-
-Contributing
-
-Contributions are welcome via issues and pull requests. For reproducibility:
-
-Describe data sources clearly
-
-Pin versions when possible
-
-Keep scripts deterministic and log key parameters
-
-Citation
-
-If you use this repository in academic work, please cite it as software:
-
-Sana Hassan Imam. Automating the Information Extraction. GitHub repository.
-
-(Add a DOI later via Zenodo if you want a formal software citation.)
+Keep raw PDFs locally and commit only code, schemas, and small demo outputs.
 
 License
-
-See the LICENSE file in this repository.
+See LICENSE in this repository.
 
 Contact
-
 Maintainer: Sana Hassan Imam
 GitHub: sanahassanimam
 
 
----
-
-## .gitignore (Python-focused)
-
-```gitignore
-# =========================
-# Python / Bytecode
-# =========================
-__pycache__/
-*.py[cod]
-*$py.class
-
-# =========================
-# Virtual environments
-# =========================
-.venv/
-venv/
-ENV/
-env/
-.conda/
-conda-env/
-# (If you use conda, environments are usually outside the repo,
-# but some people keep them here.)
-
-# =========================
-# Packaging / build
-# =========================
-build/
-dist/
-*.egg-info/
-.eggs/
-pip-wheel-metadata/
-
-# =========================
-# Test / coverage
-# =========================
-.pytest_cache/
-.coverage
-coverage.xml
-htmlcov/
-.tox/
-.nox/
-
-# =========================
-# Jupyter / IPython
-# =========================
-.ipynb_checkpoints/
-profile_default/
-ipython_config.py
-
-# =========================
-# IDEs / editors
-# =========================
-.vscode/
-.idea/
-*.iml
-*.swp
-.DS_Store
-Thumbs.db
-
-# =========================
-# Logs / temp files
-# =========================
-*.log
-*.tmp
-*.temp
-
-# =========================
-# Secrets (IMPORTANT)
-# =========================
-.env
-.env.*
-*.key
-*.pem
-*secret*
-*apikey*
-*api_key*
-
-# =========================
-# Data / outputs (recommended to keep out of git)
-# Adjust these to your workflow
-# =========================
-data/
-datasets/
-outputs/
-results/
-cache/
-tmp/
-
-# =========================
-# PDFs & large documents (optional)
-# If your repo should include PDFs, REMOVE these lines.
-# =========================
-*.pdf
-
-# =========================
-# Model artifacts (optional)
-# =========================
-models/
-checkpoints/
-*.pt
-*.pth
-*.onnx
+If you want, paste your **final folder names exactly** (the two hyphen names you ended up using), and I’ll adjust the repository tree block to match them perfectly.
