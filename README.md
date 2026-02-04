@@ -148,7 +148,7 @@ http://127.0.0.1:5173/extractor_ui.html
 ---
 ## **Workflow Overview**
 
-![Automating the Information Extraction workflow](images/workflow-diagram.png)
+![Automating the Information Extraction workflow](images/workflow.png)
 
 ## Extraction Logic
 - Heuristics provide evidence-backed values whenever possible.
