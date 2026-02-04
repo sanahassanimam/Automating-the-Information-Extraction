@@ -146,6 +146,9 @@ http://127.0.0.1:5173/extractor_ui.html
 6. Download the CSV output
 
 ---
+## **Workflow Overview**
+
+![Automating the Information Extraction workflow](images/workflow-diagram.png)
 
 ## Extraction Logic
 - Heuristics provide evidence-backed values whenever possible.
@@ -170,3 +173,4 @@ See the LICENSE file in this repository.
 ## Contact
 Sana Hassan Imam  
 GitHub: sanahassanimam
+Email:sana.hassan.imam@uni-oldenburg.de
