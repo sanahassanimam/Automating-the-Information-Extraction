@@ -7,7 +7,7 @@ This repository contains **two independent but complementary tools** for academi
 
 The tools are deliberately separated:
 - **Paper Finder** answers *“Which papers should I look at?”*
-- **Info Extractor** answers *“What structured information can I extract from this paper?”*
+- **Info Extractor** answers *“What information can I extract from this paper?”*
 
 ---
 
@@ -37,106 +37,104 @@ It supports rapid exploration and export of candidate papers for later screening
 - **arXiv**
 
 ### **Key Features**
-- Keyword-based search
-- Publication year range filtering
-- Per-source result limits
-- Enable/disable individual sources
-- Optional **open-access-only** filtering for OpenAlex
-- Manual paper selection
-- Export selected papers to **CSV**
+- Keyword-based search  
+- Publication year range filtering  
+- Per-source result limits  
+- Enable/disable individual sources  
+- Optional **open-access-only** filtering (OpenAlex)  
+- Manual paper selection  
+- Export selected papers to **CSV**  
 - Open available **PDF links** (OA PDFs when available)
 
 ### **How to Run**
 Paper Finder is a **static HTML application**.
 
-**Option A — Open directly**
+#### **Option A — Open directly**
 - Double-click `paper-finder/search.html`
 
-**Option B — Serve locally (recommended)**
+#### **Option B — Serve locally (recommended)**
+
 ```bash
 cd paper-finder
 python -m http.server 5174
-
-## **Open in Browser**
-
+Open in Browser
 http://127.0.0.1:5174/search.html
+Notes
+OpenAlex may provide direct open-access (OA) PDF links.
 
-------------------------------------------------------------------------
+PubMed results link to PubMed landing pages; OA detection is limited in this MVP.
 
-## **Notes**
+arXiv papers are open by default and usually include direct PDF links.
 
-- **OpenAlex** may provide direct open-access (OA) PDF links.
-- **PubMed** results link to PubMed landing pages; open-access detection
-  is limited in this MVP.
-- **arXiv** papers are open by default and usually include direct PDF
-  links.
-- **Paper Finder does not download or parse PDFs**; it is used only to
-  identify and shortlist relevant papers.
+Paper Finder does not download or parse PDFs; it only helps identify and shortlist relevant papers.
 
-------------------------------------------------------------------------
+2. Info Extractor
+Purpose
+Info Extractor is a paper-level information extraction tool.
 
-## **2. Info Extractor**
+You provide:
 
-### **Purpose**
+a PDF (uploaded locally or via URL), and
 
-Info Extractor is a **paper-level information extraction tool**.
+a schema describing what to extract
 
-You provide: - a **PDF** (uploaded locally or via URL), and - a **schema
-describing what to extract**,
+The system returns structured output in JSON and CSV formats.
 
-and the system returns structured output in **JSON** and **CSV**
-formats.
+Extraction Modes
+Heuristics-Based Extraction (Default)
+Regex-based
 
-------------------------------------------------------------------------
+Evidence-driven
 
-## **Extraction Modes**
+Transparent and fast
 
-### **Heuristics-Based Extraction (Default)**
+Suitable for technical metadata (e.g., sample_size, TR, TE)
 
-- Regex-based
-- Evidence-driven
-- Transparent and fast
-- Suitable for technical metadata (e.g., `sample_size`, `TR`, `TE`)
+LLM-Assisted Extraction (Optional)
+Uses a local Ollama model
 
-### **LLM-Assisted Extraction (Optional)**
+Constrained by a JSON Schema
 
-- Uses a **local Ollama model**
-- Constrained by a **JSON Schema**
-- Heuristics are used to fill missing or null values
-- No external API calls
+Heuristics fill missing or null values
 
-------------------------------------------------------------------------
+No external API calls
 
-## **Key Features**
+Key Features
+PDF upload or PDF URL input
 
-- PDF upload or PDF URL input
-- User-defined extraction fields (one field per line)
-- Automatic **JSON Schema generation**
-- Optional field generation from natural-language prompts
-- Evidence snippets for heuristic matches
-- JSON Schema validation
-- One-click **CSV export** (single-row output)
+User-defined extraction fields (one field per line)
 
-------------------------------------------------------------------------
+Automatic JSON Schema generation
 
-## **How to Run Info Extractor (Local / Windows)**
+Optional field generation from natural-language prompts
 
-### **Terminal 1 --- Ollama (Optional)**
+Evidence snippets for heuristic matches
 
+JSON Schema validation
+
+One-click CSV export (single-row output)
+
+How to Run Info Extractor (Local / Windows)
+Terminal 1 — Ollama (Optional)
 Only required if LLM-based extraction is enabled.
 
-\`\`\`bash ollama serve Terminal 2 --- Backend (FastAPI) cd
-"C:`\Users`{=tex}`\imam`{=tex}`\Documents`{=tex}`\paper`{=tex}-extractor`\info`{=tex}-extractor`\backend`{=tex}"
-conda activate paperextract uvicorn server:app --reload --port 8000 API
-root:
+ollama serve
+Terminal 2 — Backend (FastAPI)
+cd "C:\Users\imam\Documents\paper-extractor\info-extractor\backend"
+conda activate paperextract
+uvicorn server:app --reload --port 8000
+API root:
 
-http://127.0.0.1:8000 API documentation:
+http://127.0.0.1:8000
+API documentation:
 
-http://127.0.0.1:8000/docs Terminal 3 --- Frontend (HTML UI) cd
-"C:`\Users`{=tex}`\imam`{=tex}`\Documents`{=tex}`\paper`{=tex}-extractor`\info`{=tex}-extractor`\frontend`{=tex}"
-python -m http.server 5173 Open in browser:
-
-http://127.0.0.1:5173/extractor_ui.html Typical Info Extractor Workflow
+http://127.0.0.1:8000/docs
+Terminal 3 — Frontend (HTML UI)
+cd "C:\Users\imam\Documents\paper-extractor\info-extractor\frontend"
+python -m http.server 5173
+Open in Browser
+http://127.0.0.1:5173/extractor_ui.html
+Typical Info Extractor Workflow
 Provide a paper
 
 Paste a PDF URL, or
@@ -145,8 +143,16 @@ Upload a local PDF
 
 Define extraction fields (one per line), for example:
 
-title authors\[\] year doi sample_size TR TE scanner smoothing Generate
-the schema
+title
+authors[]
+year
+doi
+sample_size
+TR
+TE
+scanner
+smoothing
+Generate the schema
 
 Automatically, or
 
@@ -168,8 +174,8 @@ Validation errors (if any)
 
 Download the CSV output
 
-Extraction Logic (Important) Heuristics provide evidence-backed values
-whenever possible.
+Extraction Logic (Important)
+Heuristics provide evidence-backed values whenever possible.
 
 If LLM extraction is enabled:
 
@@ -179,13 +185,16 @@ Missing or null fields are filled using heuristics.
 
 Final output always conforms to the generated JSON Schema.
 
-Data and Reproducibility Notes Do not commit large PDFs or private
-datasets to GitHub.
+Data and Reproducibility Notes
+Do not commit large PDFs or private datasets to GitHub.
 
 Keep PDFs locally (e.g., in a non-tracked data/ directory).
 
 Commit only code, schemas, and small example outputs.
 
-License See the LICENSE file in this repository.
+License
+See the LICENSE file in this repository.
 
-Contact Sana Hassan Imam GitHub: sanahassanimam
+Contact
+Sana Hassan Imam
+GitHub: sanahassanimam
