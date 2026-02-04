@@ -170,3 +170,4 @@ See the LICENSE file in this repository.
 ## Contact
 Sana Hassan Imam  
 GitHub: sanahassanimam
+Email:sana.hassan.imam@uni-oldenburg.de
