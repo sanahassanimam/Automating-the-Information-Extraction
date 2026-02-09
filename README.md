@@ -21,12 +21,9 @@ Automating-the-Information-Extraction/
 
 └── info-extractor/
 
-    ├── backend/
-    
-    │   └── server.py
-    
-    └── frontend/
-    
+    ├── backend/    
+    │   └── server.py    
+    └── frontend/    
         └── extractor_ui.html
 
 ---
