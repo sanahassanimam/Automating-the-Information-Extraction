@@ -20,7 +20,6 @@ Automating-the-Information-Extraction/
 │   └── search.html
 
 └── info-extractor/
-
     ├── backend/    
     │   └── server.py    
     └── frontend/    
