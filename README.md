@@ -14,13 +14,20 @@ The tools are deliberately separated:
 ## Repository Structure
 
 Automating-the-Information-Extraction/
+
 ├── paper-finder/
+
 │   └── search.html
+<<<<<<< HEAD
 │   └── server.py
+=======
+
+>>>>>>> a6c6efcde1ebf694cce844d8c34d23c5057e0a31
 └── info-extractor/
-    ├── backend/
-    │   └── server.py
-    └── frontend/
+    
+    ├── backend/    
+    │   └── server.py    
+    └── frontend/    
         └── extractor_ui.html
 
 ---
