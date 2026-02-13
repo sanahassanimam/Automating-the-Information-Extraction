@@ -13,7 +13,7 @@ The tools are deliberately separated:
 
 ## Repository Structure
 
-Automating-the-Information-Extraction/
+```Automating-the-Information-Extraction/
 ├── paper-finder/            # Literature search GUI
 │   ├── search.html          # Browser-based interface
 │   └── server.py            # Flask backend (PubMed/arXiv proxy)
@@ -22,7 +22,7 @@ Automating-the-Information-Extraction/
     │   └── server.py        # Extraction API
     └── frontend/
         └── extractor_ui.html # Extraction GUI
-
+```
 
 ---
 
