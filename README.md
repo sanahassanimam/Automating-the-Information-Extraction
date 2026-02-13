@@ -14,21 +14,15 @@ The tools are deliberately separated:
 ## Repository Structure
 
 Automating-the-Information-Extraction/
+├── paper-finder/            # Literature search GUI
+│   ├── search.html          # Browser-based interface
+│   └── server.py            # Flask backend (PubMed/arXiv proxy)
+└── info-extractor/          # Information extraction module
+    ├── backend/
+    │   └── server.py        # Extraction API
+    └── frontend/
+        └── extractor_ui.html # Extraction GUI
 
-├── paper-finder/
-
-│   └── search.html
-<<<<<<< HEAD
-│   └── server.py
-=======
-
->>>>>>> a6c6efcde1ebf694cce844d8c34d23c5057e0a31
-└── info-extractor/
-    
-    ├── backend/    
-    │   └── server.py    
-    └── frontend/    
-        └── extractor_ui.html
 
 ---
 
