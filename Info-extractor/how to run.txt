@@ -6,12 +6,12 @@ ollama serve
 (If already running, you can skip.)
 
 Terminal 2 (backend)
-cd "C:\Users\imam\Documents\paper-extractor\paper extractor\backend"
+cd "C:\Users\imam\Documents\paper-extractor\Automating-the-Information-Extraction\Info-extractor\backend"
 conda activate paperextract
 uvicorn server:app --reload --port 8000
 
 Terminal 3 (frontend server)
-cd "C:\Users\imam\Documents\paper-extractor\paper extractor\frontend"
+cd "C:\Users\imam\Documents\paper-extractor\Automating-the-Information-Extraction\Info-extractor\frontend"
 python -m http.server 5173
 
 
