@@ -14,14 +14,18 @@ The tools are deliberately separated:
 ## Repository Structure
 
 ```Automating-the-Information-Extraction/
-├── paper-finder/            # Literature search GUI
-│   ├── search.html          # Browser-based interface
-│   └── server.py            # Flask backend (PubMed/arXiv proxy)
-└── info-extractor/          # Information extraction module
+├── paper-finder/                 # Literature search GUI
+│   ├── search.html               # Browser-based interface
+│   └── server.py                 # Flask backend (PubMed/arXiv proxy)
+│
+├── classification/               # Paper relevance classification module
+│   └── Classification.ipynb      # Notebook for classifying relevant vs irrelevant papers
+│
+└── info-extractor/               # Information extraction module
     ├── backend/
-    │   └── server.py        # Extraction API
+    │   └── server.py             # Extraction API
     └── frontend/
-        └── extractor_ui.html # Extraction GUI
+        └── extractor_ui.html     # Extraction GUI
 ```
 
 ---
@@ -222,7 +226,202 @@ Paper-Finder is ideal for:
 - Not intended as a full systematic review automation engine
 ---
 
-## 2. Info Extractor
+# 📑 Paper Classification Module
+
+## Overview
+
+The **Classification** module is responsible for automatically distinguishing
+**relevant** and **irrelevant** scientific papers after the literature search step.
+This serves as an intermediate filtering stage between **paper retrieval**
+and **information extraction**, reducing manual screening effort and improving
+pipeline efficiency.
+
+The main file in this module is:
+
+- `Classification.ipynb`
+
+---
+
+## Purpose in the Pipeline
+
+This module operates **after Paper Finder** and **before Info Extractor**:
+
+Paper Finder → **Classification** → Information Extractor
+
+Only papers classified as *relevant* are forwarded for structured information
+extraction.
+
+---
+
+## File Description
+
+### `Classification.ipynb`
+
+A Jupyter notebook implementing an end-to-end paper classification workflow.
+
+---
+
+## Notebook Structure & Block Summary
+
+### 1️⃣ Imports & Environment Setup
+- Loads required Python libraries (e.g., pandas, numpy, sklearn, transformers, etc.)
+- Sets random seeds and basic configuration for reproducibility
+
+**Purpose:**  
+Prepare the environment for data loading, modeling, and evaluation.
+
+---
+
+### 2️⃣ Data Loading
+- Reads metadata and/or extracted text from papers
+- Supports CSV, JSON, or preprocessed outputs from the Paper Finder module
+
+**Purpose:**  
+Bring paper titles, abstracts, or full text into a structured format suitable for classification.
+
+---
+
+### 3️⃣ Data Preprocessing
+- Text cleaning (lowercasing, removing special characters)
+- Handling missing values
+- Optional text truncation or normalization
+
+**Purpose:**  
+Ensure consistent and clean textual input for the classifier.
+
+---
+
+### 4️⃣ Feature Representation
+- Converts text into model-ready representations
+  - TF-IDF vectors **or**
+  - Transformer-based embeddings (if used)
+
+**Purpose:**  
+Transform raw text into numerical features that capture semantic information.
+
+---
+
+### 5️⃣ Classification Model
+- Implements a relevance classifier
+  - Rule-based, classical ML, or LLM-based (depending on configuration)
+- Binary output:
+  - `Relevant`
+  - `Irrelevant`
+
+**Purpose:**  
+Automatically decide whether a paper should be kept for further analysis.
+
+---
+
+### 6️⃣ Prediction & Label Assignment
+- Applies the trained or loaded model to unseen papers
+- Adds a `relevance_label` column to the dataset
+
+**Purpose:**  
+Generate machine-readable relevance decisions for downstream modules.
+
+---
+
+### 7️⃣ Evaluation (Optional)
+- Computes metrics such as accuracy, precision, recall, or F1-score
+- Supports manual inspection of misclassified papers
+
+**Purpose:**  
+Assess classification quality and identify systematic errors.
+
+---
+
+### 8️⃣ Output & Export
+- Saves classified papers to disk
+- Separates relevant and irrelevant papers if required
+
+**Purpose:**  
+Provide clean inputs for the Information Extraction module.
+
+---
+
+## Outputs
+
+Typical outputs include:
+- Classified CSV/JSON files
+- Lists of relevant paper IDs
+- Optional logs or evaluation summaries
+
+---
+## Block Summary
+classification_pipeline:
+  block_0:
+    title: "Setup & Configuration"
+    purpose: "Initialize the classification pipeline"
+    description:
+      - "Load required libraries and environment settings"
+      - "Configure model selection (Local LLM or GPT)"
+      - "Define input/output paths and prompt logic"
+
+  block_1:
+    title: "Gather & Extract Papers"
+    purpose: "Prepare text data for screening"
+    description:
+      - "Load PDFs from input directories (pdfs1, pdfs2, ...)"
+      - "Extract text from PDF files"
+      - "Store extracted content in a structured format"
+
+  block_2:
+    title: "Screen & Classify Papers"
+    purpose: "Run LLM-based relevance screening"
+    description:
+      - "Use Local LLM (Ollama) or GPT-based model"
+      - "Apply prompt-based classification logic"
+      - "Process papers individually or in batches"
+
+  block_3:
+    title: "Assign Relevance Labels"
+    purpose: "Convert model output into classification decisions"
+    description:
+      - "Assign binary relevance labels"
+      - "Relevant or Irrelevant labels derived from prompt responses"
+
+  block_4:
+    title: "Review & Analyze Results"
+    purpose: "Inspect and validate classification outputs"
+    description:
+      - "Review papers classified as relevant"
+      - "Enable manual inspection and error analysis"
+      - "Support iterative refinement of prompts"
+
+  block_5:
+    title: "Save Filtered Output"
+    purpose: "Export results for downstream analysis"
+    description:
+      - "Save relevant papers as CSV files"
+      - "Export detailed classification metadata"
+      - "Prepare clean input for the information extraction module"
+
+
+---
+
+## Notes
+
+- The notebook is designed to be **modular and extensible**
+- Can be adapted to use:
+  - Local LLMs (e.g., Ollama)
+  - API-based LLMs (if keys are available)
+- Supports iterative refinement as classification criteria evolve
+
+---
+
+## Role in Reproducibility
+
+By explicitly documenting classification decisions, this module improves:
+- Transparency
+- Reproducibility
+- Auditability of paper screening decisions
+
+
+
+
+---
+## 3. Info Extractor
 ![Info Extractor Interface](images/info_extractor.jpeg)
 ### Purpose
 Info Extractor is a **paper-level information extraction tool**.
