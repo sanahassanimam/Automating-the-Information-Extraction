@@ -352,6 +352,7 @@ Typical outputs include:
 classification_pipeline:
 ## block_0:
 **title: "Setup & Configuration"** 
+
 **purpose: "Initialize the classification pipeline"**
 description:
 - "Load required libraries and environment settings"
@@ -360,6 +361,7 @@ description:
 
 ## block_1:
 **title: "Gather & Extract Papers"**
+
 **purpose: "Prepare text data for screening"**
 description:
 - "Load PDFs from input directories (pdfs1, pdfs2, ...)"
