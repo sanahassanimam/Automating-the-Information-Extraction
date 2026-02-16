@@ -223,7 +223,7 @@ Paper-Finder is ideal for:
 ---
 
 ## 2. Info Extractor
-
+![Info Extractor Interface](images/info_extractor.jpeg)
 ### Purpose
 Info Extractor is a **paper-level information extraction tool**.
 
