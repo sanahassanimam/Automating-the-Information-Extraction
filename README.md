@@ -354,6 +354,7 @@ classification_pipeline:
 **title: "Setup & Configuration"** 
 
 **purpose: "Initialize the classification pipeline"**
+
 description:
 - "Load required libraries and environment settings"
 - "Configure model selection (Local LLM or GPT)"
@@ -363,6 +364,7 @@ description:
 **title: "Gather & Extract Papers"**
 
 **purpose: "Prepare text data for screening"**
+
 description:
 - "Load PDFs from input directories (pdfs1, pdfs2, ...)"
 - "Extract text from PDF files"
@@ -370,7 +372,9 @@ description:
 
 ## block_2:
 **title: "Screen & Classify Papers"**
+
 **purpose: "Run LLM-based relevance screening"**
+
 description:
 - "Use Local LLM (Ollama) or GPT-based model"
 - "Apply prompt-based classification logic"
@@ -378,14 +382,18 @@ description:
 
 ## block_3:
 **title: "Assign Relevance Labels"** 
+
 **purpose: "Convert model output into classification decisions"** 
+
 description:
 - "Assign binary relevance labels"
 - "Relevant or Irrelevant labels derived from prompt responses"
 
 ## block_4:
 **title: "Review & Analyze Results"** 
+
 **purpose: "Inspect and validate classification outputs"** 
+
 description:
 - "Review papers classified as relevant"
 - "Enable manual inspection and error analysis"
@@ -393,7 +401,9 @@ description:
 
 ## block_5:
 **title: "Save Filtered Output"** 
+
 **purpose: "Export results for downstream analysis"** 
+
 description:
 - "Save relevant papers as CSV files"
 - "Export detailed classification metadata"
